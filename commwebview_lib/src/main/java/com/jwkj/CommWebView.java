@@ -25,6 +25,8 @@ import android.widget.LinearLayout;
 
 import org.json.JSONObject;
 
+import java.lang.reflect.Method;
+
 
 /**
  * 通用webview
@@ -66,6 +68,8 @@ public class CommWebView extends LinearLayout {
     private NetErrorConfig netErrorConfig = NetErrorConfig.DEFAULT_BODY;
 
     private JSCallJava jsCallJava;
+    Object mapClazz;
+    String objName;
 
     public CommWebView(Context context) {
         this(context, null);
@@ -148,14 +152,26 @@ public class CommWebView extends LinearLayout {
                     //动态注入的好处就是不影响线上的h5数据,不影响ios使用
                     //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
                     //prompt()方法是js弹出的可输入的提示框
-                    view.loadUrl("javascript:if(window.NativeObj == undefined){" +
-                            "window.NativeObj=\n" +
-                            "{" +
-                            "onButtonClick:function(arg0,arg1){" +
-                            "prompt('{\\\"methodName\\\":' + javaMethod + ',\\\"jsonValue\\\":' + \n" + "jsonValue + '}')" +
-                            "}" +
-                            "}" +
-                            "};");
+                    if (!TextUtils.isEmpty(objName)){
+                        view.loadUrl("javascript:if(window."+objName+"== undefined){" +
+                                "window."+objName+"=\n" +
+                                "{" +
+                                "onButtonClick:function(arg0,arg1){" +
+                                "prompt('{\\\"methodName\\\":' + javaMethod + ',\\\"jsonValue\\\":' + \n" + "jsonValue + '}')" +
+                                "}" +
+                                "}" +
+                                "};");
+                    }else {
+                        view.loadUrl("javascript:if(window.NativeObj == undefined){" +
+                                "window.NativeObj=\n" +
+                                "{" +
+                                "onButtonClick:function(arg0,arg1){" +
+                                "prompt('{\\\"methodName\\\":' + javaMethod + ',\\\"jsonValue\\\":' + \n" + "jsonValue + '}')" +
+                                "}" +
+                                "}" +
+                                "};");
+                    }
+
                 }
 
                 if (callback != null) {
@@ -259,7 +275,16 @@ public class CommWebView extends LinearLayout {
                                 JSONObject jsonObject = new JSONObject(message);
                                 String methodName = jsonObject.getString("methodName");
                                 String jsonValue = jsonObject.getString("jsonValue");
-                                jsCallJava.refreshPager();
+                                Method [] methods = mapClazz.getClass().getMethods();
+//                                boolean isMethod = false;
+//                                for (int i = 0; i < methods.length; i++) {
+//                                    if (methods[i].getName().equals(methodName)){
+//                                        isMethod = true;
+//                                    }
+//                                }
+//                                if (!isMethod){
+                                    jsCallJava.refreshPager();
+//                                }
                             } catch (Exception e) {
 
                             }
@@ -277,14 +302,16 @@ public class CommWebView extends LinearLayout {
         LayoutParams params = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         webview.setLayoutParams(params);
         // webview.addJavascriptInterface(new JSCallJava(), "NativeObj");
+        jsCallJava = new JSCallJava();
+        this.mapClazz = jsCallJava;
+        this.objName = "NativeObj";
         if (Build.VERSION.SDK_INT >= 17) {
             // 在sdk4.2以上的系统上继续使用addJavascriptInterface
-            webview.addJavascriptInterface(new JSCallJava(), "NativeObj");
+            webview.addJavascriptInterface(jsCallJava, "NativeObj");
         }else {
             //4.2之前 addJavascriptInterface有安全泄漏风险
             //移除js中的searchBoxJavaBridge_对象,在Android 3.0以下，系统自己添加了一个叫
             //searchBoxJavaBridge_的Js接口，要解决这个安全问题，我们也需要把这个接口删除
-            jsCallJava = new JSCallJava();
             webview.removeJavascriptInterface("searchBoxJavaBridge_");
             // 在 h5开始加载时动态给js注入NativeObj对象和call方法,模拟addJavascriptInterface
             //接口给js注入NativeObj对象
@@ -465,6 +492,8 @@ public class CommWebView extends LinearLayout {
      */
     @SuppressLint("JavascriptInterface")
     public CommWebView addJavascriptInterface(Object mapClazz, String objName) {
+        this.mapClazz = mapClazz;
+        this.objName = objName;
         if (Build.VERSION.SDK_INT >= 17) {
             // 在sdk4.2以上的系统上继续使用addJavascriptInterface
             webview.addJavascriptInterface(mapClazz, objName);
@@ -480,7 +509,7 @@ public class CommWebView extends LinearLayout {
             //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
             //prompt()方法是js弹出的可输入的提示框
 
-            webview.loadUrl("javascript:if(window.NativeObj == undefined){window.NativeObj=\n"+  "{call:function(arg0,arg1){prompt('{\\\"methodName\\\":' + arg0 + ',\\\"jsonValue\\\":' + \n" +  "arg1 + '}')}}};\"");
+            webview.loadUrl("javascript:if(window."+objName+"== undefined){window."+objName+"=\n"+  "{call:function(arg0,arg1){prompt('{\\\"methodName\\\":' + arg0 + ',\\\"jsonValue\\\":' + \n" +  "arg1 + '}')}}};\"");
         }
 //        webview.addJavascriptInterface(mapClazz, objName);
         return this;
