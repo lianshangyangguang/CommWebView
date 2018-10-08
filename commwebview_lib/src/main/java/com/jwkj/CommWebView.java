@@ -152,16 +152,7 @@ public class CommWebView extends LinearLayout {
                     //动态注入的好处就是不影响线上的h5数据,不影响ios使用
                     //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
                     //prompt()方法是js弹出的可输入的提示框
-                    if (!TextUtils.isEmpty(objName)){
-                        view.loadUrl("javascript:if(window."+objName+"== undefined){" +
-                                "window."+objName+"=\n" +
-                                "{" +
-                                "onButtonClick:function(arg0,arg1){" +
-                                "prompt('{\\\"methodName\\\":' + javaMethod + ',\\\"jsonValue\\\":' + \n" + "jsonValue + '}')" +
-                                "}" +
-                                "}" +
-                                "};");
-                    }else {
+           
                         view.loadUrl("javascript:if(window.NativeObj == undefined){" +
                                 "window.NativeObj=\n" +
                                 "{" +
@@ -170,8 +161,7 @@ public class CommWebView extends LinearLayout {
                                 "}" +
                                 "}" +
                                 "};");
-                    }
-
+ 
                 }
 
                 if (callback != null) {
@@ -493,7 +483,7 @@ public class CommWebView extends LinearLayout {
     @SuppressLint("JavascriptInterface")
     public CommWebView addJavascriptInterface(Object mapClazz, String objName) {
         this.mapClazz = mapClazz;
-        this.objName = objName;
+        //this.objName = objName;
         if (Build.VERSION.SDK_INT >= 17) {
             // 在sdk4.2以上的系统上继续使用addJavascriptInterface
             webview.addJavascriptInterface(mapClazz, objName);
@@ -509,7 +499,7 @@ public class CommWebView extends LinearLayout {
             //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
             //prompt()方法是js弹出的可输入的提示框
 
-            webview.loadUrl("javascript:if(window."+objName+"== undefined){window."+objName+"=\n"+  "{call:function(arg0,arg1){prompt('{\\\"methodName\\\":' + arg0 + ',\\\"jsonValue\\\":' + \n" +  "arg1 + '}')}}};\"");
+            webview.loadUrl("javascript:if(window.NativeObj == undefined){window.NativeObj=\n"+  "{call:function(arg0,arg1){prompt('{\\\"methodName\\\":' + arg0 + ',\\\"jsonValue\\\":' + \n" +  "arg1 + '}')}}};\"");
         }
 //        webview.addJavascriptInterface(mapClazz, objName);
         return this;
