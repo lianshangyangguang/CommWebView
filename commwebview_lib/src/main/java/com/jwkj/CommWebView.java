@@ -55,7 +55,7 @@ public class CommWebView extends LinearLayout {
     /**
      * 采用addview(webview)的方式添加到线性布局，可以及时销毁webview
      */
-    private WebView webview;
+    private SafeWebView webview;
 
     private Context context;
     /**
@@ -110,7 +110,7 @@ public class CommWebView extends LinearLayout {
      * @param context
      */
     private void initConfig(final Context context) {
-        webview = new WebView(context.getApplicationContext());
+        webview = new SafeWebView(context.getApplicationContext());
         transparent();
         WebSettings settings = webview.getSettings();
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
@@ -125,7 +125,7 @@ public class CommWebView extends LinearLayout {
         webview.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         settings.setJavaScriptEnabled(true);//设置是否支持与js互相调用
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);//不使用网络缓存，开启的话容易导致app膨胀导致卡顿
-        webview.setWebViewClient(new WebViewClient() {//设置webviewclient,使其不会由第三方浏览器打开新的url
+        webview.setWebViewClient(webview.new WebViewClientEx() {//设置webviewclient,使其不会由第三方浏览器打开新的url
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -146,28 +146,10 @@ public class CommWebView extends LinearLayout {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
 
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    // 在 h5开始加载时动态给js注入NativeObj对象和call方法,模拟addJavascriptInterface
-                    //接口给js注入NativeObj对象
-                    //动态注入的好处就是不影响线上的h5数据,不影响ios使用
-                    //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
-                    //prompt()方法是js弹出的可输入的提示框
-           
-                        view.loadUrl("javascript:if(window.NativeObj == undefined){" +
-                                "window.NativeObj=\n" +
-                                "{" +
-                                "onButtonClick:function(arg0,arg1){" +
-                                "prompt('{\\\"methodName\\\":' + javaMethod + ',\\\"jsonValue\\\":' + \n" + "jsonValue + '}')" +
-                                "}" +
-                                "}" +
-                                "};");
- 
-                }
-
                 if (callback != null) {
                     callback.onStart();
                 }
-
+                super.onPageStarted(view, url, favicon);
             }
 
             @Override
@@ -198,7 +180,7 @@ public class CommWebView extends LinearLayout {
                 handler.cancel();
             }
         });
-        webview.setWebChromeClient(new WebChromeClient() {//监听加载的过程
+        webview.setWebChromeClient(webview.new WebChromeClientEx() {//监听加载的过程
             private View mCustomView;
             private CustomViewCallback mCustomViewCallback;
 
@@ -244,6 +226,7 @@ public class CommWebView extends LinearLayout {
 
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
+                super.onProgressChanged(view, newProgress);
                 if (view != null && view.getUrl() != null && !"file:".equals(view.getUrl().substring(0, 5))) {
                     curWebUrl = view.getUrl();
                 }
@@ -251,38 +234,6 @@ public class CommWebView extends LinearLayout {
                 if (callback != null) {
                     callback.onProgress(newProgress);
                 }
-            }
-
-            @Override
-            public boolean onJsPrompt(WebView view, String url,final String message, String defaultValue, JsPromptResult result) {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                //message的格式是json
-                                //jsCallManager.call方法是原来处理js响应事件的方法，methodName是指要处理的js事件名称，jsonValue是指要处理的js事件的参数
-                                JSONObject jsonObject = new JSONObject(message);
-                                String methodName = jsonObject.getString("methodName");
-                                String jsonValue = jsonObject.getString("jsonValue");
-                                Method [] methods = mapClazz.getClass().getMethods();
-//                                boolean isMethod = false;
-//                                for (int i = 0; i < methods.length; i++) {
-//                                    if (methods[i].getName().equals(methodName)){
-//                                        isMethod = true;
-//                                    }
-//                                }
-//                                if (!isMethod){
-                                    jsCallJava.refreshPager();
-//                                }
-                            } catch (Exception e) {
-
-                            }
-                        }
-                    }).start();
-                    result.confirm("callBackMessage");//返回给js的去处理的数据
-                }
-                return super.onJsPrompt(view, url, message, defaultValue, result);
             }
         });
         setVisibility(View.VISIBLE);
@@ -295,22 +246,7 @@ public class CommWebView extends LinearLayout {
         jsCallJava = new JSCallJava();
         this.mapClazz = jsCallJava;
         this.objName = "NativeObj";
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            // 在sdk4.2以上的系统上继续使用addJavascriptInterface
-            webview.addJavascriptInterface(jsCallJava, "NativeObj");
-        }else {
-            //4.2之前 addJavascriptInterface有安全泄漏风险
-            //移除js中的searchBoxJavaBridge_对象,在Android 3.0以下，系统自己添加了一个叫
-            //searchBoxJavaBridge_的Js接口，要解决这个安全问题，我们也需要把这个接口删除
-            webview.removeJavascriptInterface("searchBoxJavaBridge_");
-            // 在 h5开始加载时动态给js注入NativeObj对象和call方法,模拟addJavascriptInterface
-            //接口给js注入NativeObj对象
-            //动态注入的好处就是不影响线上的h5数据,不影响ios使用
-            //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
-            //prompt()方法是js弹出的可输入的提示框
-
-            webview.loadUrl("javascript:if(window.NativeObj == undefined){window.NativeObj=\n"+  "{call:function(arg0,arg1){prompt('{\\\"methodName\\\":' + arg0 + ',\\\"jsonValue\\\":' + \n" +  "arg1 + '}')}}};\"");
-        }
+        webview.addJavascriptInterface(jsCallJava, "NativeObj");
 
 //        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {//3.0以上暂时关闭硬件加速
 //            webview.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
@@ -405,7 +341,7 @@ public class CommWebView extends LinearLayout {
      *
      * @return
      */
-    public WebView getWebview() {
+    public SafeWebView getWebview() {
         return webview;
     }
 
@@ -483,25 +419,7 @@ public class CommWebView extends LinearLayout {
     @SuppressLint("JavascriptInterface")
     public CommWebView addJavascriptInterface(Object mapClazz, String objName) {
         this.mapClazz = mapClazz;
-        //this.objName = objName;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            // 在sdk4.2以上的系统上继续使用addJavascriptInterface
-            webview.addJavascriptInterface(mapClazz, objName);
-        } else {
-            //4.2之前 addJavascriptInterface有安全泄漏风险
-            //移除js中的searchBoxJavaBridge_对象,在Android 3.0以下，系统自己添加了一个叫
-            //searchBoxJavaBridge_的Js接口，要解决这个安全问题，我们也需要把这个接口删除
-            jsCallJava = new JSCallJava();
-            webview.removeJavascriptInterface("searchBoxJavaBridge_");
-            // 在 h5开始加载时动态给js注入NativeObj对象和call方法,模拟addJavascriptInterface
-            //接口给js注入NativeObj对象
-            //动态注入的好处就是不影响线上的h5数据,不影响ios使用
-            //在onPageStarted方法中注入是因为在h5的onload方法中有与本地交互的处理
-            //prompt()方法是js弹出的可输入的提示框
-
-            webview.loadUrl("javascript:if(window.NativeObj == undefined){window.NativeObj=\n"+  "{call:function(arg0,arg1){prompt('{\\\"methodName\\\":' + arg0 + ',\\\"jsonValue\\\":' + \n" +  "arg1 + '}')}}};\"");
-        }
-//        webview.addJavascriptInterface(mapClazz, objName);
+        webview.addJavascriptInterface(mapClazz, objName);
         return this;
     }
 
