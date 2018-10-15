@@ -146,7 +146,7 @@ public class CommWebView extends LinearLayout {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
 
-                if (Build.VERSION.SDK_INT < 17) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     // 在 h5开始加载时动态给js注入NativeObj对象和call方法,模拟addJavascriptInterface
                     //接口给js注入NativeObj对象
                     //动态注入的好处就是不影响线上的h5数据,不影响ios使用
@@ -255,7 +255,7 @@ public class CommWebView extends LinearLayout {
 
             @Override
             public boolean onJsPrompt(WebView view, String url,final String message, String defaultValue, JsPromptResult result) {
-                if (Build.VERSION.SDK_INT < 17) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
@@ -295,7 +295,7 @@ public class CommWebView extends LinearLayout {
         jsCallJava = new JSCallJava();
         this.mapClazz = jsCallJava;
         this.objName = "NativeObj";
-        if (Build.VERSION.SDK_INT >= 17) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             // 在sdk4.2以上的系统上继续使用addJavascriptInterface
             webview.addJavascriptInterface(jsCallJava, "NativeObj");
         }else {
@@ -484,7 +484,7 @@ public class CommWebView extends LinearLayout {
     public CommWebView addJavascriptInterface(Object mapClazz, String objName) {
         this.mapClazz = mapClazz;
         //this.objName = objName;
-        if (Build.VERSION.SDK_INT >= 17) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             // 在sdk4.2以上的系统上继续使用addJavascriptInterface
             webview.addJavascriptInterface(mapClazz, objName);
         } else {
